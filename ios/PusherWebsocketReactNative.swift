@@ -220,7 +220,7 @@ import Foundation
                 "eventName": mappedEventName ?? event.eventName,
                 "userId": event.userId ?? userId,
                 "data": event.data,
-                "raw": event.raw["data"],
+                "raw": event.property(withKey: "data"),
             ]
         )
     }
