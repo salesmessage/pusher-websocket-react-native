@@ -200,7 +200,6 @@ export class Pusher {
       const eventName = event.eventName;
       const data = event.data;
       const userId = event.userId;
-      const raw = event.raw;
       const channel = this.channels.get(channelName);
 
       switch (eventName) {
