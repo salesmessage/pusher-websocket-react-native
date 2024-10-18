@@ -219,7 +219,8 @@ import Foundation
                 "channelName": event.channelName,
                 "eventName": mappedEventName ?? event.eventName,
                 "userId": event.userId ?? userId,
-                "data": event.data
+                "data": event.data,
+                "raw": event.raw["data"],
             ]
         )
     }
