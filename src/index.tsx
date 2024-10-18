@@ -41,19 +41,22 @@ export class PusherEvent {
   eventName: string;
   data: any;
   userId?: string;
+  raw: any;
   constructor(args: {
     channelName: string;
     eventName: string;
     data: any;
     userId?: string;
+    raw: any;
   }) {
     this.channelName = args.channelName;
     this.eventName = args.eventName;
     this.data = args.data;
     this.userId = args.userId;
+    this.raw = args.raw;
   }
   toString() {
-    return `{ channelName: ${this.channelName}, eventName: ${this.eventName}, data: ${this.data}, userId: ${this.userId} }`;
+    return `{ channelName: ${this.channelName}, eventName: ${this.eventName}, data: ${this.data}, userId: ${this.userId}, raw: ${this.raw}}`;
   }
 }
 
@@ -141,7 +144,7 @@ export class Pusher {
 
   public init(args: {
     apiKey: string;
-    cluster: string;
+    cluster?: string;
     authEndpoint?: string;
     useTLS?: boolean;
     activityTimeout?: Number;
@@ -197,6 +200,7 @@ export class Pusher {
       const eventName = event.eventName;
       const data = event.data;
       const userId = event.userId;
+      const raw = event.raw;
       const channel = this.channels.get(channelName);
 
       switch (eventName) {
