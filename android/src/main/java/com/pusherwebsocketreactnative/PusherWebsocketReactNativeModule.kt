@@ -159,8 +159,19 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   fun onAuthorizer(channelName: String, socketId: String, data: ReadableMap, promise: Promise) {
     val key = channelName + socketId
+
+    // Initialize semaphore for the current key if it doesn't exist
+    if (!authorizerMutex.containsKey(key)) {
+      authorizerMutex[key] = Semaphore(0)
+    }
+
     authorizerResult[key] = data
-    authorizerMutex[key]!!.release()
+
+    val mutex = authorizerMutex[key]
+    if (mutex != null) {
+      authorizerMutex[key]!!.release()
+    }
+
     authorizerMutex.remove(key)
     promise.resolve(null)
   }
