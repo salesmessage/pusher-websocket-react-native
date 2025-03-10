@@ -185,8 +185,8 @@ export class Pusher {
       (event: any) => {
         this.connectionState = event.currentState.toUpperCase();
         args.onConnectionStateChange?.(
-          event.currentState.toUpperCase(),
-          event.previousState.toUpperCase()
+          event.currentState?.toUpperCase(),
+          event.previousState?.toUpperCase()
         );
       }
     );
