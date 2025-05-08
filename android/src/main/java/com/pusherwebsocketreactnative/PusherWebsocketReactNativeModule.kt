@@ -231,6 +231,11 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
   } // Other ChannelEventListener methods
 
   override fun onUsersInformationReceived(channelName: String?, users: MutableSet<User>?) {
+    if (channelName == null || users == null) {
+      Log.e(TAG, "onUsersInformationReceived: channelName or users is null")
+      return
+    }
+
     val gson = Gson()
     val channel = pusher!!.getPresenceChannel(channelName)
     val hash = mutableMapOf<String, Any?>()
