@@ -211,8 +211,9 @@ import Foundation
         resolve(nil)
     }
 
-    public func getSocketId() -> String? {
-        return PusherWebsocketReactNative.pusher.connection.socketId
+    public func getSocketId(_ resolve:RCTPromiseResolveBlock, reject:RCTPromiseRejectBlock) {
+        let socketId = PusherWebsocketReactNative.pusher.connection.socketId
+        resolve(socketId)
     }
 
     func onEvent(event:PusherEvent) {

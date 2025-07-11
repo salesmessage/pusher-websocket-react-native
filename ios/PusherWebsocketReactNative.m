@@ -33,6 +33,7 @@ RCT_EXTERN_METHOD(onAuthorizer:(NSString*)channelName
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN__BLOCKING_SYNCHRONOUS_METHOD(getSocketId)
+RCT_EXTERN_METHOD(getSocketId:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 
 @end
