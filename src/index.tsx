@@ -368,7 +368,9 @@ export class Pusher {
   }
 
   public async getSocketId() {
-    return await PusherWebsocketReactNative.getSocketId();
+    return new Promise((resolve, reject) => {
+      PusherWebsocketReactNative.getSocketId().then(resolve).catch(reject);
+    });
   }
 
   public getChannel(channelName: string): PusherChannel | undefined {
