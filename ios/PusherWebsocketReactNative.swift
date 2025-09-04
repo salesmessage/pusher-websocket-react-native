@@ -12,6 +12,8 @@ import Foundation
     private let subscriptionErrorType = "SubscriptionError"
     private let authErrorType = "AuthError"
     private let pusherEventPrefix = "PusherReactNative"
+    
+    private let syncQueue = DispatchQueue(label: "com.salesmessage.arcadia.PusherWebSocketSyncQueue")
 
     override init() {
         super.init()
@@ -123,21 +125,29 @@ import Foundation
                 completionHandler(PusherAuth(auth: "<missing_auth_param>:error", channelData: authParams["channel_data"], sharedSecret: authParams["shared_secret"]))
             }
         }
-        authorizerCompletionHandlers[key] = authCallback
-
+        
+        syncQueue.async { [weak self] in
+            self?.authorizerCompletionHandlers[key] = authCallback
+        }
+        
         // the JS thread might not call onAuthorizer – we need to cleanup the completion handler after timeout
         let timeout = DispatchTimeInterval.seconds(PusherWebsocketReactNative.shared.authorizerCompletionHandlerTimeout)
-        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) {
-            if let storedAuthHandler = PusherWebsocketReactNative.shared.authorizerCompletionHandlers.removeValue(forKey: key) {
-                storedAuthHandler(["auth": "<authorizer_timeout>:error"])
+        syncQueue.asyncAfter(deadline: .now() + timeout) { [weak self] in
+            if let storedAuthHandler = self?.authorizerCompletionHandlers.removeValue(forKey: key) {
+                DispatchQueue.main.async {
+                    storedAuthHandler(["auth": "<authorizer_timeout>:error"])
+                }
             }
         }
     }
 
     public func onAuthorizer(_ channelName: String, socketID: String, data:[String:String], resolve:RCTPromiseResolveBlock,reject:RCTPromiseRejectBlock) {
         let key = channelName + socketID
-        if let storedAuthHandler = authorizerCompletionHandlers.removeValue(forKey: key) {
-            storedAuthHandler(data)
+        
+        syncQueue.async { [weak self] in
+            if let storedAuthHandler = self?.authorizerCompletionHandlers.removeValue(forKey: key) {
+                storedAuthHandler(data)
+            }
         }
     }
 
@@ -219,7 +229,8 @@ import Foundation
                 "channelName": event.channelName,
                 "eventName": mappedEventName ?? event.eventName,
                 "userId": event.userId ?? userId,
-                "data": event.data
+                "data": event.data,
+                "raw": event.property(withKey: "data"),
             ]
         )
     }

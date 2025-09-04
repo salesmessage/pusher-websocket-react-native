@@ -41,19 +41,22 @@ export class PusherEvent {
   eventName: string;
   data: any;
   userId?: string;
+  raw: any;
   constructor(args: {
     channelName: string;
     eventName: string;
     data: any;
     userId?: string;
+    raw: any;
   }) {
     this.channelName = args.channelName;
     this.eventName = args.eventName;
     this.data = args.data;
     this.userId = args.userId;
+    this.raw = args.raw;
   }
   toString() {
-    return `{ channelName: ${this.channelName}, eventName: ${this.eventName}, data: ${this.data}, userId: ${this.userId} }`;
+    return `{ channelName: ${this.channelName}, eventName: ${this.eventName}, data: ${this.data}, userId: ${this.userId}, raw: ${this.raw}}`;
   }
 }
 
@@ -141,7 +144,7 @@ export class Pusher {
 
   public init(args: {
     apiKey: string;
-    cluster: string;
+    cluster?: string;
     authEndpoint?: string;
     useTLS?: boolean;
     activityTimeout?: Number;
@@ -150,6 +153,7 @@ export class Pusher {
     maxReconnectGapInSeconds?: Number;
     authorizerTimeoutInSeconds?: Number;
     proxy?: string;
+    host?: string;
     onConnectionStateChange?: (
       currentState: string,
       previousState: string
@@ -181,8 +185,8 @@ export class Pusher {
       (event: any) => {
         this.connectionState = event.currentState.toUpperCase();
         args.onConnectionStateChange?.(
-          event.currentState.toUpperCase(),
-          event.previousState.toUpperCase()
+          event.currentState?.toUpperCase(),
+          event.previousState?.toUpperCase()
         );
       }
     );
@@ -286,6 +290,7 @@ export class Pusher {
       authorizerTimeoutInSeconds: args.authorizerTimeoutInSeconds,
       authorizer: args.onAuthorizer ? true : false,
       proxy: args.proxy,
+      host: args.host,
     });
   }
 
