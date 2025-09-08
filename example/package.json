@@ -23,6 +23,7 @@
   "resolutions": {
     "semver": ">=6.3.1",
     "crypto-es": ">=2.1.0",
-    "braces": ">=3.0.3"
+    "braces": ">=3.0.3",
+    "ip": ">=2.0.1"
   }
 }
