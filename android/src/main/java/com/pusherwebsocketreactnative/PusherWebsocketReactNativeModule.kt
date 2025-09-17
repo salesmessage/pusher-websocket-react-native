@@ -108,7 +108,7 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
       channel.bindGlobal(this)
       promise.resolve(null)
     } catch (e: Exception) {
-      promise.reject("Error", "Failed to subscribe to channel: $channelName", e)
+      promise.reject("Error", "Failed to subscribe to channel: $channelName. Message: $e", e)
     }
   }
 
