@@ -14,6 +14,7 @@ import com.pusher.client.util.HttpChannelAuthorizer
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 
 class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext),
@@ -142,38 +143,68 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
   }
 
   override fun authorize(channelName: String, socketId: String): String? {
-    pusherEventEmitter.emit(
-      "onAuthorizer", mapOf(
-        "channelName" to channelName,
-        "socketId" to socketId
+    try {
+      pusherEventEmitter.emit(
+        "onAuthorizer", mapOf(
+          "channelName" to channelName,
+          "socketId" to socketId
+        )
       )
-    )
-    val key = channelName + socketId
-    authorizerMutex[key] = Semaphore(0)
-    authorizerMutex[key]!!.acquire()
-    val authParams = authorizerResult.remove(key)!!
-    val gson = Gson()
-    return gson.toJson(authParams.toHashMap())
+      val key = channelName + socketId
+      authorizerMutex[key] = Semaphore(0)
+
+      // Wait for authorization response with timeout
+      val semaphore = authorizerMutex[key]!!
+      val acquired = semaphore.tryAcquire(30, TimeUnit.SECONDS)
+
+      if (!acquired) {
+        Log.e(TAG, "Authorization timeout for channel: $channelName")
+        authorizerMutex.remove(key)
+        return null // Graceful failure instead of crash
+      }
+
+      val authParams = authorizerResult.remove(key)
+      if (authParams == null) {
+        Log.e(TAG, "No authorization data received for channel: $channelName")
+        return null // Graceful failure instead of crash
+      }
+
+      val gson = Gson()
+      return gson.toJson(authParams.toHashMap())
+    } catch (e: Exception) {
+      Log.e(TAG, "Authorization failed for channel: $channelName", e)
+      return null // Graceful failure instead of crash
+    }
   }
 
   @ReactMethod
   fun onAuthorizer(channelName: String, socketId: String, data: ReadableMap, promise: Promise) {
-    val key = channelName + socketId
+    try {
+      val key = channelName + socketId
+      Log.d(TAG, "onAuthorizer called for channel: $channelName, socketId: $socketId")
 
-    // Initialize semaphore for the current key if it doesn't exist
-    if (!authorizerMutex.containsKey(key)) {
-      authorizerMutex[key] = Semaphore(0)
+      // Initialize semaphore for the current key if it doesn't exist
+      if (!authorizerMutex.containsKey(key)) {
+        Log.w(TAG, "Semaphore not found for key: $key. Creating new one.")
+        authorizerMutex[key] = Semaphore(0)
+      }
+
+      authorizerResult[key] = data
+
+      val mutex = authorizerMutex[key]
+      if (mutex != null) {
+        Log.d(TAG, "Releasing semaphore for key: $key")
+        mutex.release()
+      } else {
+        Log.e(TAG, "Semaphore is null for key: $key")
+      }
+
+      authorizerMutex.remove(key)
+      promise.resolve(null)
+    } catch (e: Exception) {
+      Log.e(TAG, "Error in onAuthorizer for channel: $channelName", e)
+      promise.reject("AUTHORIZATION_ERROR", "Failed to process authorization data", e)
     }
-
-    authorizerResult[key] = data
-
-    val mutex = authorizerMutex[key]
-    if (mutex != null) {
-      authorizerMutex[key]!!.release()
-    }
-
-    authorizerMutex.remove(key)
-    promise.resolve(null)
   }
 
   // Event handlers
