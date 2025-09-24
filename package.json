@@ -150,14 +150,6 @@
   "resolutions": {
     "semver": ">=6.3.1",
     "braces": ">=3.0.3",
-    "ip": ">=2.0.1",
-    "react-devtools-core": ">=4.28.4",
-    "tmp": "^0.2.5"
-  },
-  "overrides": {
-    "semver": ">=6.3.1",
-    "braces": ">=3.0.3",
-    "ip": ">=2.0.1",
     "react-devtools-core": ">=4.28.4",
     "tmp": "^0.2.5"
   }
