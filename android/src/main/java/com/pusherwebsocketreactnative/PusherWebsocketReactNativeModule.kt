@@ -26,6 +26,7 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
   private val TAG = "PusherReactNative"
   private val authorizerMutex = mutableMapOf<String, Semaphore>()
   private val authorizerResult = mutableMapOf<String, ReadableMap>()
+  private val channelsDataMap = mutableMapOf<String, String>()
 
   private val pusherEventEmitter = PusherEventEmitter(reactContext)
 
@@ -94,8 +95,10 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
-  fun subscribe(channelName: String, promise: Promise) {
+  fun subscribe(channelName: String, channelData: String, promise: Promise) {
     try {
+      channelsDataMap[channelName] = channelData
+
       val channel = when {
         channelName.startsWith("private-encrypted-") -> pusher!!.subscribePrivateEncrypted(
           channelName, this
@@ -116,6 +119,7 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   fun unsubscribe(channelName: String, promise: Promise) {
     pusher!!.unsubscribe(channelName)
+    channelsDataMap.remove(channelName)
     promise.resolve(null)
   }
 
@@ -143,68 +147,34 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
   }
 
   override fun authorize(channelName: String, socketId: String): String? {
-    try {
-      pusherEventEmitter.emit(
-        "onAuthorizer", mapOf(
-          "channelName" to channelName,
-          "socketId" to socketId
+      Log.i(TAG, "[PusherWebsocketReactNativeModule:authorize] called for channel: $channelName, socketId: $socketId")
+
+      val channelDataString = channelsDataMap[channelName]
+      try {
+        val channelData = Gson().fromJson(channelDataString, Map::class.java)
+
+        if (channelData != null) {
+          Log.i(TAG, "[PusherWebsocketReactNativeModule:authorize] channelDataString: $channelDataString")
+
+          return channelDataString
+        }
+      } catch (e: Exception) {
+        Log.w(TAG, "Could not take channelData from JSON: $channelName. channelDataString: $channelDataString", e)
+
+        pusherEventEmitter.emit(
+          "onSubscriptionError", mapOf(
+            "message" to e.message,
+            "error" to e.toString()
+          )
         )
-      )
-      val key = channelName + socketId
-      authorizerMutex[key] = Semaphore(0)
-
-      // Wait for authorization response with timeout
-      val semaphore = authorizerMutex[key]!!
-      val acquired = semaphore.tryAcquire(30, TimeUnit.SECONDS)
-
-      if (!acquired) {
-        Log.e(TAG, "Authorization timeout for channel: $channelName")
-        authorizerMutex.remove(key)
-        return null // Graceful failure instead of crash
       }
 
-      val authParams = authorizerResult.remove(key)
-      if (authParams == null) {
-        Log.e(TAG, "No authorization data received for channel: $channelName")
-        return null // Graceful failure instead of crash
-      }
-
-      val gson = Gson()
-      return gson.toJson(authParams.toHashMap())
-    } catch (e: Exception) {
-      Log.e(TAG, "Authorization failed for channel: $channelName", e)
-      return null // Graceful failure instead of crash
-    }
+      return null //"{\"auth\":\"\",\"channel_data\":null}"
   }
 
   @ReactMethod
   fun onAuthorizer(channelName: String, socketId: String, data: ReadableMap, promise: Promise) {
-    try {
-      val key = channelName + socketId
-      Log.d(TAG, "onAuthorizer called for channel: $channelName, socketId: $socketId")
-
-      // Initialize semaphore for the current key if it doesn't exist
-      if (!authorizerMutex.containsKey(key)) {
-        Log.w(TAG, "Semaphore not found for key: $key. Creating new one.")
-        authorizerMutex[key] = Semaphore(0)
-      }
-
-      authorizerResult[key] = data
-
-      val mutex = authorizerMutex[key]
-      if (mutex != null) {
-        Log.d(TAG, "Releasing semaphore for key: $key")
-        mutex.release()
-      } else {
-        Log.e(TAG, "Semaphore is null for key: $key")
-      }
-
-      authorizerMutex.remove(key)
-      promise.resolve(null)
-    } catch (e: Exception) {
-      Log.e(TAG, "Error in onAuthorizer for channel: $channelName", e)
-      promise.reject("AUTHORIZATION_ERROR", "Failed to process authorization data", e)
-    }
+    Log.d(TAG, "onAuthorizer called for channel: $channelName, socketId: $socketId")
   }
 
   // Event handlers
@@ -267,32 +237,28 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
       return
     }
 
-    try {
-      val gson = Gson()
-      val channel = pusher!!.getPresenceChannel(channelName)
-      val hash = mutableMapOf<String, Any?>()
-      // convert users back to original structure.
-      for (user in users!!) {
-        hash[user.id] = gson.fromJson(user.info, Map::class.java)
-      }
-      val data = mapOf(
-        "presence" to mapOf(
-          "count" to users.size,
-          "ids" to users.map { it.id },
-          "hash" to hash
-        )
-      )
-      pusherEventEmitter.emit(
-        "onEvent", mapOf(
-          "channelName" to channelName,
-          "eventName" to "pusher_internal:subscription_succeeded",
-          "userId" to channel.me.id,
-          "data" to data
-        )
-      )
-    } catch (e: Exception) {
-      Log.e(TAG, "Error in onUsersInformationReceived for channel: $channelName", e)
+    val gson = Gson()
+    val channel = pusher!!.getPresenceChannel(channelName)
+    val hash = mutableMapOf<String, Any?>()
+    // convert users back to original structure.
+    for (user in users!!) {
+      hash[user.id] = gson.fromJson(user.info, Map::class.java)
     }
+    val data = mapOf(
+      "presence" to mapOf(
+        "count" to users.size,
+        "ids" to users.map { it.id },
+        "hash" to hash
+      )
+    )
+    pusherEventEmitter.emit(
+      "onEvent", mapOf(
+        "channelName" to channelName,
+        "eventName" to "pusher_internal:subscription_succeeded",
+        "userId" to channel.me.id,
+        "data" to data
+      )
+    )
   }
 
   override fun onDecryptionFailure(event: String?, reason: String?) {

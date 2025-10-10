@@ -326,6 +326,7 @@ export class Pusher {
 
   async subscribe(args: {
     channelName: string;
+    channelData: string;
     onSubscriptionSucceeded?: (data: any) => void;
     onSubscriptionError?: (
       channelName: string,
@@ -341,8 +342,14 @@ export class Pusher {
       return channel;
     }
 
+    if (args.channelName.startsWith('private-')) {
+      if (!args.channelData || args.channelData === 'null') {
+        return;
+      }
+    }
+
     const newChannel = new PusherChannel(args);
-    await PusherWebsocketReactNative.subscribe(args.channelName);
+    await PusherWebsocketReactNative.subscribe(args.channelName, args.channelData);
     this.channels.set(args.channelName, newChannel);
     return newChannel;
   }
