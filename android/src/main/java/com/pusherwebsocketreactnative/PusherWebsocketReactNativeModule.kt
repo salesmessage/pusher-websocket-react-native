@@ -52,6 +52,7 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
     try {
       if (pusher != null) {
         pusher!!.disconnect()
+        channelsDataMap.clear()
       }
       val options = PusherOptions()
       if (arguments.hasKey("host")) options.setHost(arguments.getString("host"))
@@ -91,6 +92,7 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   fun disconnect(promise: Promise) {
     pusher!!.disconnect()
+    channelsDataMap.clear()
     promise.resolve(null)
   }
 
@@ -147,29 +149,29 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
   }
 
   override fun authorize(channelName: String, socketId: String): String? {
-      Log.i(TAG, "[PusherWebsocketReactNativeModule:authorize] called for channel: $channelName, socketId: $socketId")
+    Log.i(TAG, "[PusherWebsocketReactNativeModule:authorize] called for channel: $channelName, socketId: $socketId")
 
-      val channelDataString = channelsDataMap[channelName]
-      try {
-        val channelData = Gson().fromJson(channelDataString, Map::class.java)
+    val channelDataString = channelsDataMap[channelName]
+    try {
+      val channelData = Gson().fromJson(channelDataString, Map::class.java)
 
-        if (channelData != null) {
-          Log.i(TAG, "[PusherWebsocketReactNativeModule:authorize] channelDataString: $channelDataString")
+      if (channelData != null) {
+        Log.i(TAG, "[PusherWebsocketReactNativeModule:authorize] channelDataString: $channelDataString")
 
-          return channelDataString
-        }
-      } catch (e: Exception) {
-        Log.w(TAG, "Could not take channelData from JSON: $channelName. channelDataString: $channelDataString", e)
-
-        pusherEventEmitter.emit(
-          "onSubscriptionError", mapOf(
-            "message" to e.message,
-            "error" to e.toString()
-          )
-        )
+        return channelDataString
       }
+    } catch (e: Exception) {
+      Log.w(TAG, "Could not take channelData from JSON: $channelName. channelDataString: $channelDataString", e)
 
-      return null //"{\"auth\":\"\",\"channel_data\":null}"
+      pusherEventEmitter.emit(
+        "onSubscriptionError", mapOf(
+          "message" to e.message,
+          "error" to e.toString()
+        )
+      )
+    }
+
+    return null //"{\"auth\":\"\",\"channel_data\":null}"
   }
 
   @ReactMethod
