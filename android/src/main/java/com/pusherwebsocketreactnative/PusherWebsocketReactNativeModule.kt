@@ -237,28 +237,32 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
       return
     }
 
-    val gson = Gson()
-    val channel = pusher!!.getPresenceChannel(channelName)
-    val hash = mutableMapOf<String, Any?>()
-    // convert users back to original structure.
-    for (user in users!!) {
-      hash[user.id] = gson.fromJson(user.info, Map::class.java)
+    try {
+      val gson = Gson()
+      val channel = pusher!!.getPresenceChannel(channelName)
+      val hash = mutableMapOf<String, Any?>()
+      // convert users back to original structure.
+      for (user in users!!) {
+        hash[user.id] = gson.fromJson(user.info, Map::class.java)
+      }
+      val data = mapOf(
+        "presence" to mapOf(
+          "count" to users.size,
+          "ids" to users.map { it.id },
+          "hash" to hash
+        )
+      )
+      pusherEventEmitter.emit(
+        "onEvent", mapOf(
+          "channelName" to channelName,
+          "eventName" to "pusher_internal:subscription_succeeded",
+          "userId" to channel.me.id,
+          "data" to data
+        )
+      )
+    } catch (e: Exception) {
+      Log.e(TAG, "Error in onUsersInformationReceived for channel: $channelName", e)
     }
-    val data = mapOf(
-      "presence" to mapOf(
-        "count" to users.size,
-        "ids" to users.map { it.id },
-        "hash" to hash
-      )
-    )
-    pusherEventEmitter.emit(
-      "onEvent", mapOf(
-        "channelName" to channelName,
-        "eventName" to "pusher_internal:subscription_succeeded",
-        "userId" to channel.me.id,
-        "data" to data
-      )
-    )
   }
 
   override fun onDecryptionFailure(event: String?, reason: String?) {
