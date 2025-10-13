@@ -6,8 +6,8 @@ import Foundation
     private static var shared: PusherWebsocketReactNative!
     private static var pusher: Pusher!
 
-    private var authorizerCompletionHandlers = [String: ([String:String]) -> Void]()
     private var authorizerCompletionHandlerTimeout = 10 // seconds
+    private var channelsDataMap = [String: String]()
 
     private let subscriptionErrorType = "SubscriptionError"
     private let authErrorType = "AuthError"
@@ -37,11 +37,24 @@ import Foundation
         let pusherEventname = "\(pusherEventPrefix):\(name)"
         PusherWebsocketReactNative.shared.sendEvent(withName:pusherEventname, body:body)
     }
+  
+    private func sendSubscriptionErrorMessage(_ message: String, channelName: String) {
+      let code = ""
+      let type = subscriptionErrorType
+
+      PusherWebsocketReactNative.shared.callback(name:"onSubscriptionError", body:[
+          "message": message,
+          "type": type,
+          "code": code,
+          "channelName": channelName
+      ])
+    }
 
     func initialize(_ args:[String: Any], resolve:RCTPromiseResolveBlock,reject:RCTPromiseRejectBlock) {
         if PusherWebsocketReactNative.pusher != nil {
             PusherWebsocketReactNative.pusher.unsubscribeAll()
             PusherWebsocketReactNative.pusher.disconnect()
+            channelsDataMap.removeAll()
         }
         var authMethod:AuthMethod = .noMethod
         if args["authEndpoint"] is String {
@@ -112,43 +125,55 @@ import Foundation
     }
 
     public func fetchAuthValue(socketID: String, channelName: String, completionHandler: @escaping (PusherAuth?) -> Void) {
-        PusherWebsocketReactNative.shared.callback(name:"onAuthorizer", body: [
-            "socketId": socketID,
-            "channelName": channelName
-        ])
+        if channelsDataMap[channelName] == nil {
+            self.sendSubscriptionErrorMessage("channelData not found", channelName: channelName)
+            return
+        }
 
-        let key = channelName + socketID
-        let authCallback = { (authParams:[String:String]) in
-            if let authParam = authParams["auth"] {
-                completionHandler(PusherAuth(auth: authParam, channelData: authParams["channel_data"], sharedSecret: authParams["shared_secret"]))
-            } else {
-                completionHandler(PusherAuth(auth: "<missing_auth_param>:error", channelData: authParams["channel_data"], sharedSecret: authParams["shared_secret"]))
-            }
-        }
-        
-        syncQueue.async { [weak self] in
-            self?.authorizerCompletionHandlers[key] = authCallback
-        }
-        
-        // the JS thread might not call onAuthorizer – we need to cleanup the completion handler after timeout
-        let timeout = DispatchTimeInterval.seconds(PusherWebsocketReactNative.shared.authorizerCompletionHandlerTimeout)
-        syncQueue.asyncAfter(deadline: .now() + timeout) { [weak self] in
-            if let storedAuthHandler = self?.authorizerCompletionHandlers.removeValue(forKey: key) {
-                DispatchQueue.main.async {
-                    storedAuthHandler(["auth": "<authorizer_timeout>:error"])
+        let authData = channelsDataMap.removeValue(forKey: channelName)
+
+        if let jsonData = authData?.data(using: .utf8) {
+            if let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+                let auth: String?
+                let channelData: String?
+                let sharedSecret: String?
+
+                if let authValue = json["auth"] as? String {
+                    auth = authValue
+                } else {
+                    auth = nil
                 }
+
+                if let channelDataValue = json["channel_data"] as? String {
+                    channelData = channelDataValue
+                } else {
+                    channelData = nil
+                }
+
+                if let sharedSecretValue = json["shared_secret"] as? String {
+                    sharedSecret = sharedSecretValue
+                } else {
+                    sharedSecret = nil
+                }
+
+                if auth != nil && !auth!.isEmpty {
+                    completionHandler(PusherAuth(auth: auth!, channelData: channelData, sharedSecret: sharedSecret))
+                } else {
+                    completionHandler(PusherAuth(auth: "<missing_auth_param>:error", channelData: channelData, sharedSecret: sharedSecret))
+                    self.sendSubscriptionErrorMessage("Missing auth parameter", channelName: channelName)
+                }
+            } else {
+                print("Failed to parse JSON")
+                self.sendSubscriptionErrorMessage("Failed to parse JSON", channelName: channelName)
             }
+        } else {
+            print("Failed to convert string to data")
+          self.sendSubscriptionErrorMessage("Failed to convert string to data", channelName: channelName)
         }
     }
 
     public func onAuthorizer(_ channelName: String, socketID: String, data:[String:String], resolve:RCTPromiseResolveBlock,reject:RCTPromiseRejectBlock) {
-        let key = channelName + socketID
-        
-        syncQueue.async { [weak self] in
-            if let storedAuthHandler = self?.authorizerCompletionHandlers.removeValue(forKey: key) {
-                storedAuthHandler(data)
-            }
-        }
+          print("DEBUG:", "onAuthorizer called")
     }
 
     public func changedConnectionState(from old: ConnectionState, to new: ConnectionState) {
@@ -208,6 +233,7 @@ import Foundation
 
     public func disconnect(_ resolve:RCTPromiseResolveBlock,reject:RCTPromiseRejectBlock) {
         PusherWebsocketReactNative.pusher.disconnect()
+        channelsDataMap.removeAll()
         resolve(nil)
     }
 
@@ -236,7 +262,8 @@ import Foundation
         )
     }
 
-    func subscribe(_ channelName:String, resolve:RCTPromiseResolveBlock,reject:RCTPromiseRejectBlock) {
+    func subscribe(_ channelName:String, channelData: String, resolve:RCTPromiseResolveBlock,reject:RCTPromiseRejectBlock) {
+        self.channelsDataMap[channelName] = channelData
         if channelName.hasPrefix("presence-") {
             let onMemberAdded:(PusherPresenceChannelMember) -> () = { user in
                 PusherWebsocketReactNative.shared.callback(name:"onMemberAdded", body: [

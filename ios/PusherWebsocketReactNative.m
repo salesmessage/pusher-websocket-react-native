@@ -14,6 +14,7 @@ RCT_EXTERN_METHOD(disconnect:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
 RCT_EXTERN_METHOD(subscribe:(NSString*)channelName
+                  channelData:(NSString*)channelData
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
