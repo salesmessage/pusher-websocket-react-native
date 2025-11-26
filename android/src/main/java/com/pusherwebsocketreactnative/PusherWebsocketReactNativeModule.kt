@@ -159,6 +159,8 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
         Log.i(TAG, "[PusherWebsocketReactNativeModule:authorize] channelDataString: $channelDataString")
 
         return channelDataString
+      } else {
+        return "{\"auth\":\"\",\"channel_data\":null}"
       }
     } catch (e: Exception) {
       Log.w(TAG, "Could not take channelData from JSON: $channelName. channelDataString: $channelDataString", e)
@@ -171,7 +173,7 @@ class PusherWebsocketReactNativeModule(reactContext: ReactApplicationContext) :
       )
     }
 
-    return null //"{\"auth\":\"\",\"channel_data\":null}"
+    return "{\"auth\":\"\",\"channel_data\":null}"
   }
 
   @ReactMethod
