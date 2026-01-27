@@ -14,11 +14,20 @@ import Foundation
     private let pusherEventPrefix = "PusherReactNative"
     
     private let syncQueue = DispatchQueue(label: "com.salesmessage.arcadia.PusherWebSocketSyncQueue")
+    private var hasListeners = false
 
     override init() {
         super.init()
 
         PusherWebsocketReactNative.shared = self
+    }
+
+    override func startObserving() {
+        hasListeners = true
+    }
+
+    override func stopObserving() {
+        hasListeners = false
     }
 
     override func supportedEvents() -> [String]! {
@@ -35,7 +44,19 @@ import Foundation
 
     private func callback(name:String, body:Any) -> Void {
         let pusherEventname = "\(pusherEventPrefix):\(name)"
-        PusherWebsocketReactNative.shared.sendEvent(withName:pusherEventname, body:body)
+        // PusherWebsocketReactNative.shared.sendEvent(withName:pusherEventname, body:body)
+
+        // Defensive: avoid crashing when JS bridge is not ready / has been torn down.
+        // RCTEventEmitter will throw NSInternalInconsistencyException if callableJSModules is not set.
+        if !hasListeners || self.bridge == nil {
+            return
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, self.hasListeners, self.bridge != nil else { return }
+
+            self.sendEvent(withName: pusherEventname, body: body)
+        }
     }
   
     private func sendSubscriptionErrorMessage(_ message: String, channelName: String) {
