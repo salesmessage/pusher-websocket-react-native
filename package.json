@@ -152,6 +152,8 @@
     "braces": ">=3.0.3",
     "react-devtools-core": ">=4.28.4",
     "tmp": "^0.2.5",
+    "basic-ftp": ">=5.2.0",
+    "lodash": ">=4.17.23"
     "js-yaml": ">=4.1.1"
   }
 }
