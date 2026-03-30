@@ -159,6 +159,7 @@
     "handlebars": ">=4.7.9",
     "@octokit/plugin-paginate-rest": ">=11.4.1",
     "diff": ">=5.2.2",
-    "js-yaml": ">=4.1.1"
+    "js-yaml": ">=4.1.1",
+    "flatted": "3.4.2"
   }
 }
