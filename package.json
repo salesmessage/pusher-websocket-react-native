@@ -156,6 +156,7 @@
     "lodash": ">=4.17.23",
     "minimatch": ">=5.1.7",
     "ajv": ">=8.18.0",
+    "handlebars": ">=4.7.9",
     "@octokit/plugin-paginate-rest": ">=11.4.1",
     "diff": ">=5.2.2",
     "js-yaml": ">=4.1.1"
