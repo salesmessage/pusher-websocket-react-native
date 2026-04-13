@@ -153,7 +153,7 @@
     "react-devtools-core": ">=4.28.4",
     "tmp": "^0.2.5",
     "basic-ftp": ">=5.2.0",
-    "lodash": ">=4.17.23",
+    "lodash": ">=4.18.0",
     "minimatch": ">=5.1.7",
     "ajv": ">=8.18.0",
     "handlebars": ">=4.7.9",
