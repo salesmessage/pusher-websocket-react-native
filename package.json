@@ -152,7 +152,7 @@
     "braces": ">=3.0.3",
     "react-devtools-core": ">=4.28.4",
     "tmp": "^0.2.5",
-    "basic-ftp": ">=5.2.0",
+    "basic-ftp": ">=5.2.2",
     "lodash": ">=4.18.0",
     "minimatch": ">=5.1.7",
     "ajv": ">=8.18.0",
