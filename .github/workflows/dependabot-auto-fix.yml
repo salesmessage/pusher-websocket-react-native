@@ -1,0 +1,169 @@
+name: Dependabot Auto-Fix
+
+# Reads open Dependabot alerts, bumps the vulnerable npm packages, and opens ONE
+# pull request for a human to review and merge. It does NOT auto-merge — the merge
+# is the intentional human gate (a dependency bump can break the build/publish).
+# Adapted from salesmessage/mobile for this library fork: npm only (no Gemfile),
+# base branch is master, and yarn is invoked with YARN_IGNORE_PATH so the repo's
+# custom `.yarnrc` yarn-path bootstrap is bypassed for a plain lockfile update.
+
+on:
+  schedule:
+    # 03:30 UTC = 06:30 Minsk (UTC+3, no daylight saving), Monday–Friday.
+    # Minute :30 is deliberate — GitHub's scheduler is congested at the top of
+    # the hour. NOTE: forks disable workflows by default — Actions (and this
+    # scheduled workflow) must be explicitly ENABLED on this repo, and the file
+    # must be on the DEFAULT branch (master), or neither the cron nor the manual
+    # "Run workflow" button will work.
+    - cron: '30 3 * * 1-5'
+  workflow_dispatch: {}
+
+# Least privilege for the built-in GITHUB_TOKEN. The actual alert-read, branch
+# push and PR creation all run through DEPENDABOT_PAT (see below) — not this.
+permissions:
+  contents: read
+  id-token: write # required by claude-code-action
+
+# Never let two auto-fix runs race on the same branch.
+concurrency:
+  group: dependabot-auto-fix
+  cancel-in-progress: false
+
+jobs:
+  auto-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      # HARD-PINNED to master (this fork's default/integration branch). Do NOT
+      # switch to github.event.repository.default_branch or a repo variable.
+      BASE_BRANCH: master
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          # Check out with the PAT so `git push` is attributed to it — a branch
+          # pushed by the default GITHUB_TOKEN would not trigger review workflows.
+          token: ${{ secrets.DEPENDABOT_PAT }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+
+      # The claude-code-action below replaces GH_TOKEN with its own claude[bot]
+      # app token, which CANNOT read Dependabot alerts (403). So we read them here,
+      # in a plain step whose GH_TOKEN the action can't touch, and hand the agent a
+      # file. state must be a URL query param — `gh api -f state=open` flips gh to
+      # POST and 404s. This step fails loudly if the PAT lacks alert access.
+      - name: Fetch open Dependabot alerts
+        env:
+          GH_TOKEN: ${{ secrets.DEPENDABOT_PAT }}
+        run: |
+          gh api -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/dependabot/alerts?state=open&per_page=100" \
+            > /tmp/alerts-raw.json
+          jq '[.[] | {
+            number,
+            package: .security_vulnerability.package.name,
+            ecosystem: .security_vulnerability.package.ecosystem,
+            severity: .security_advisory.severity,
+            vulnerable_range: .security_vulnerability.vulnerable_version_range,
+            first_patched: .security_vulnerability.first_patched_version.identifier,
+            ghsa: .security_advisory.ghsa_id,
+            scope: .dependency.scope,
+            manifest: .dependency.manifest_path
+          }]' /tmp/alerts-raw.json > /tmp/dependabot-alerts.json
+          echo "Open alerts fetched: $(jq length /tmp/dependabot-alerts.json)"
+          cat /tmp/dependabot-alerts.json
+
+      - name: Run Claude Code to fix Dependabot alerts
+        uses: anthropics/claude-code-action@v1
+        env:
+          # The action overrides GH_TOKEN with its own claude[bot] token, so pass the
+          # PAT under a custom name it won't clobber. The agent uses it explicitly for
+          # git push + gh pr create (GitHub masks the secret value in logs).
+          DEPENDABOT_PAT: ${{ secrets.DEPENDABOT_PAT }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Bash MUST be listed — without it the agent is denied gh/git/yarn
+          # and silently does nothing (run goes green with permission_denials > 0).
+          claude_args: '--allowedTools Bash,Read,Edit,Write,Glob,Grep --max-turns 150'
+          prompt: |
+            You are running inside GitHub Actions for the repo ${{ github.repository }}
+            (a React Native library — npm only, no Ruby/bundler).
+            Your job: fix the OPEN Dependabot vulnerability alerts and open ONE pull request.
+            Be precise and conservative.
+
+            IMPORTANT — auth: the ambient `gh`/`git` are authenticated as claude[bot],
+            which CANNOT read Dependabot alerts and may lack push rights. For anything
+            that touches the remote (push, gh pr create) you MUST use the PAT in the
+            environment variable $DEPENDABOT_PAT, as shown in STEP 4. Do NOT call the
+            Dependabot alerts API yourself — the alerts are already provided as a file.
+
+            STEP 1 — The open alerts have ALREADY been fetched for you into
+            /tmp/dependabot-alerts.json — a JSON array of objects with fields:
+            { number, package, ecosystem (expected "npm"), severity,
+              vulnerable_range, first_patched, ghsa, scope, manifest }.
+            Read that file. Deduplicate by package (several alerts can share one
+            package); keep the alert numbers per package for the PR body.
+            If the array is EMPTY ([]): print "No open alerts." and STOP — do not open a PR.
+
+            STEP 2 — Fix the packages. Work in BATCHES — do NOT run install once per
+            package. Use first_patched from the file as the target; choose the SMALLEST
+            bump that reaches it. NEVER apply a major-version bump automatically (it can
+            break the library build/publish); if only a major version fixes it, leave it
+            and record it under "Needs manual review". Do NOT use `yarn why`.
+
+            • npm packages (do ALL of them in one pass, then ONE install):
+                - For every vulnerable npm package, add BOTH resolution forms this repo
+                  already uses to the "resolutions" block in package.json, pinned to
+                  first_patched (resolutions cover direct AND transitive uses):
+                      "<pkg>": "<patched>",
+                      "**/<pkg>": "<patched>"
+                - After ALL edits are written, update the lockfile EXACTLY ONCE. This repo
+                  has a custom `.yarnrc` (yarn-path) and a `prepare: bob build` hook, so
+                  bypass both for a clean lockfile-only update:
+                      YARN_IGNORE_PATH=1 yarn install --non-interactive --ignore-scripts
+                  It MUST succeed. If it fails, read the error, remove ONLY the offending
+                  resolution(s), note them under "Needs manual review", and run once more.
+
+            STEP 3 — Sanity check: confirm `git diff --name-only` shows ONLY package.json
+            and yarn.lock (no source files). If anything else changed, undo it.
+
+            STEP 4 — If at least one package was fixed, open the PR. Use the PAT for the
+            remote operations (the ambient claude[bot] auth will not work):
+              - git config user.name "github-actions[bot]"
+              - git config user.email "github-actions[bot]@users.noreply.github.com"
+              - BRANCH="automated/dependabot-fixes-$(date -u +%Y%m%d-%H%M)"
+              - git checkout -b "$BRANCH"
+              - git commit -am "Fix Dependabot alerts"
+              - Push with the PAT (value is masked in logs):
+                  git push "https://x-access-token:${DEPENDABOT_PAT}@github.com/${{ github.repository }}.git" "HEAD:$BRANCH"
+              - Open the PR with the PAT against the base branch:
+                  GH_TOKEN="$DEPENDABOT_PAT" gh pr create --base "$BASE_BRANCH" --head "$BRANCH" \
+                    --title "Fix N Dependabot alerts" --body "<body below>"
+                (replace N with the count actually fixed)
+              - PR body: a markdown table with columns
+                Package | Ecosystem | Severity | From → To | Advisory (GHSA) | Alert #
+                followed by a "## Needs manual review" section listing anything skipped
+                (package, why it was skipped, the major version that would fix it).
+              - Print the PR URL.
+
+            STEP 5 — ALWAYS write a run summary to /tmp/dependabot-summary.md (a later
+            workflow step publishes it to the run's Summary page). Do NOT open a GitHub
+            issue. The file must contain:
+              - a one-line result: N packages fixed (include the PR URL if you opened one)
+              - if any alerts could NOT be auto-fixed, a "## Needs manual review" markdown
+                table with columns:
+                Package | Ecosystem | Severity | Current → Patched | Advisory (GHSA) | Alert # | Why manual
+            Write this file whether or not a PR was opened.
+
+      - name: Publish summary to the run page
+        if: always()
+        run: |
+          if [ -f /tmp/dependabot-summary.md ]; then
+            cat /tmp/dependabot-summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No summary file was produced by the agent." >> "$GITHUB_STEP_SUMMARY"
+          fi
