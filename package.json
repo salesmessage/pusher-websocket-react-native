@@ -159,14 +159,21 @@
     "handlebars": ">=4.7.9",
     "@octokit/plugin-paginate-rest": ">=11.4.1",
     "diff": ">=5.2.2",
-    "js-yaml": "4.2.0",
-    "**/js-yaml": "4.2.0",
+    "js-yaml": "4.3.0",
+    "**/js-yaml": "4.3.0",
     "flatted": "3.4.2",
     "ip-address": "^10.1.1",
-    "shell-quote": "^1.8.4",
+    "shell-quote": "1.9.0",
+    "**/shell-quote": "1.9.0",
     "@babel/core": "7.29.6",
     "**/@babel/core": "7.29.6",
     "brace-expansion": "5.0.7",
-    "**/brace-expansion": "5.0.7"
+    "**/brace-expansion": "5.0.7",
+    "fast-uri": "3.1.4",
+    "**/fast-uri": "3.1.4",
+    "react-native/ws": "6.2.4",
+    "**/@react-native/dev-middleware/ws": "6.2.4",
+    "**/metro/ws": "7.5.11",
+    "react-devtools-core/ws": "7.5.11"
   }
 }
