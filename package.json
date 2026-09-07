@@ -170,11 +170,13 @@
     "**/@babel/core": "7.29.6",
     "brace-expansion": "5.0.7",
     "**/brace-expansion": "5.0.7",
-    "fast-uri": "3.1.5",
-    "**/fast-uri": "3.1.5",
+    "fast-uri": "3.1.6",
+    "**/fast-uri": "3.1.6",
     "react-native/ws": "6.2.4",
     "**/@react-native/dev-middleware/ws": "6.2.4",
     "**/metro/ws": "7.5.11",
-    "react-devtools-core/ws": "7.5.11"
+    "react-devtools-core/ws": "7.5.11",
+    "browserslist": "4.28.7",
+    "**/browserslist": "4.28.7"
   }
 }
