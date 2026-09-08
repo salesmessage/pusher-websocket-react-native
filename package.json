@@ -175,6 +175,8 @@
     "react-native/ws": "6.2.4",
     "**/@react-native/dev-middleware/ws": "6.2.4",
     "**/metro/ws": "7.5.11",
-    "react-devtools-core/ws": "7.5.11"
+    "react-devtools-core/ws": "7.5.11",
+    "browserslist": "4.28.7",
+    "**/browserslist": "4.28.7"
   }
 }
