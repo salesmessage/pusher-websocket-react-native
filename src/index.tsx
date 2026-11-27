@@ -349,7 +349,10 @@ export class Pusher {
     }
 
     const newChannel = new PusherChannel(args);
-    await PusherWebsocketReactNative.subscribe(args.channelName, args.channelData);
+    await PusherWebsocketReactNative.subscribe(
+      args.channelName,
+      args.channelData
+    );
     this.channels.set(args.channelName, newChannel);
     return newChannel;
   }

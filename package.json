@@ -49,6 +49,7 @@
   "devDependencies": {
     "@commitlint/config-conventional": "^17.2.0",
     "@react-native-community/eslint-config": "^3.2.0",
+    "@react-native/babel-preset": "0.81.6",
     "@release-it/conventional-changelog": "^5.1.1",
     "@types/jest": "^29.2.2",
     "@types/react": "^18.0.25",
@@ -154,7 +155,6 @@
     "tmp": "^0.2.6",
     "basic-ftp": ">=6.2.4",
     "lodash": ">=4.18.0",
-    "ajv": ">=8.18.0",
     "handlebars": "4.7.10",
     "**/handlebars": "4.7.10",
     "@octokit/plugin-paginate-rest": ">=11.4.1",
@@ -175,8 +175,6 @@
     "react-native/ws": "6.2.4",
     "**/@react-native/dev-middleware/ws": "6.2.4",
     "**/metro/ws": "7.5.11",
-    "react-devtools-core/ws": "7.5.11",
-    "browserslist": "4.28.7",
-    "**/browserslist": "4.28.7"
+    "react-devtools-core/ws": "7.5.11"
   }
 }
