@@ -49,7 +49,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
 
       # The claude-code-action below replaces GH_TOKEN with its own claude[bot]
       # app token, which CANNOT read Dependabot alerts (403). So we read them here,
