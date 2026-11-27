@@ -146,7 +146,7 @@
     ]
   },
   "dependencies": {
-    "semver": "^6.3.1"
+    "semver": "^7.8.6"
   },
   "resolutions": {
     "semver": ">=6.3.1",
